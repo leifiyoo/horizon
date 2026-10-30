@@ -7110,7 +7110,11 @@ impl Game<'_> {
         }
         let (w, h) = (batch.width, batch.height);
         if r.joined {
-            // LevelLoadingScreen: the world's terrain comes in.
+            // LevelLoadingScreen: the world's terrain comes in, with no
+            // server progress on a server's client.
+            horizon_client::widgets::begin_screen(|| {
+                super::screen_info::level_loading(None, &super::screen_info::tr)
+            });
             let atlas = &self.gui.atlas;
             horizon_client::ui::menu_background(batch, atlas, 0.0, 0.0, w, h, false);
             horizon_client::level_loading::draw(batch, atlas, None, None);
@@ -7131,6 +7135,16 @@ impl Game<'_> {
             ));
         }
         let Some(r) = &self.remote else { return false };
+        // ConnectScreen: `GameNarrator.NO_TITLE`, then its Cancel; single
+        // player's server is joined under its LevelLoadingScreen.
+        let single_player = self.integrated.is_some();
+        horizon_client::widgets::begin_screen(|| {
+            if single_player {
+                super::screen_info::level_loading(None, &super::screen_info::tr)
+            } else {
+                horizon_client::widgets::ScreenInfo::new("connect", "")
+            }
+        });
         let atlas = &self.gui.atlas;
         let status = horizon_client::text::Text::literal(r.status.as_str());
         horizon_client::level_loading::draw_connecting(batch, atlas, &status, self.cursor, cancel);

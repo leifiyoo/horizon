@@ -734,6 +734,10 @@ impl Loading {
     pub(super) fn draw_menu(&mut self, batch: &mut HudBatch) {
         let Some(gui) = &self.gui else { return };
         if self.menu.pending.is_some() {
+            let progress = self.progress.fraction();
+            horizon_client::widgets::begin_screen(|| {
+                super::screen_info::level_loading(Some(progress), &super::screen_info::tr)
+            });
             horizon_client::level_loading::draw_progress(
                 batch,
                 &gui.atlas,
@@ -745,6 +749,7 @@ impl Loading {
             // 20 ticks a second: the startup menu runs no tick rate.
             let delta_ticks = now.duration_since(*frame).as_secs_f32() * 20.0;
             *frame = now;
+            horizon_client::widgets::begin_screen(|| win.screen_info());
             win.draw(batch, &gui.atlas, delta_ticks, Default::default());
             if win.finished(batch.height) {
                 self.menu.win = None;
