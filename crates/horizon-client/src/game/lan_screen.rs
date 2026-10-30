@@ -950,6 +950,16 @@ impl Game<'_> {
         self.close_world_options();
     }
 
+    /// Whether the port field or a game rule's box has the focus and takes
+    /// the keys.
+    pub(super) fn world_options_typing(&self) -> bool {
+        self.screen == Screen::WorldOptions
+            && self.world_options.as_ref().is_some_and(|o| match &o.rules {
+                Some(rules) => rules.typing(),
+                None => o.port.focused && o.view == View::Options,
+            })
+    }
+
     pub(super) fn world_options_key(&mut self, event: &KeyEvent) {
         if event.state != winit::event::ElementState::Pressed {
             return;
