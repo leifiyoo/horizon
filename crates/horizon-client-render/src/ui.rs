@@ -355,6 +355,9 @@ pub fn button(
     hover: bool,
 ) {
     crate::widgets::record(&label.plain(), [x, y, w, h], active);
+    crate::widgets::narratable(|| {
+        crate::widgets::Narratable::button(label.plain(), [x, y, w, h], active).hovered(hover)
+    });
     crate::widgets::widget_cursor(hover, active);
     let sprite = if !active {
         "gui/sprites/widget/button_disabled"
@@ -397,6 +400,9 @@ pub fn slider(
     };
     // The control socket's widget tree (`ui`): its label and value.
     crate::widgets::record_as(&label.plain(), [x, y, w, 20.0], active, kind);
+    crate::widgets::narratable(|| {
+        crate::widgets::Narratable::slider(label.plain(), [x, y, w, 20.0], active).hovered(hover)
+    });
     if active {
         // A controller's D-pad can focus it (Horizon's controller support).
         crate::widgets::target_as([x, y, w, 20.0], kind);
@@ -641,6 +647,7 @@ pub fn tooltip(batch: &mut HudBatch, atlas: &HudAtlas, lines: &[Text], cursor: (
     if lines.is_empty() {
         return;
     }
+    crate::widgets::frame_tooltip(lines);
     let w = lines
         .iter()
         .map(|l| atlas.font.width_text(l))
@@ -707,6 +714,9 @@ pub struct EditBox {
     /// Grey completion shown after the text (EditBox.setSuggestion).
     pub suggestion: Option<String>,
     pub text_color: u32,
+    /// `getMessage`: what the narrator calls the box ("<message> edit box:
+    /// <value>").
+    pub message: String,
 }
 /// The focused text field of a screen that keeps its values as `String`s
 /// (the world list's search, world names, seeds, and the server screens): the `EditBox` state that
@@ -968,6 +978,7 @@ impl EditBox {
             focused_at: Instant::now(),
             suggestion: None,
             text_color: rgba(224, 224, 224, 255),
+            message: String::new(),
         }
     }
     pub fn inner_width(&self) -> f32 {
@@ -1190,6 +1201,14 @@ impl EditBox {
             [self.x, self.y, self.width, self.height],
             crate::widgets::Kind::Field,
         );
+        crate::widgets::narratable(|| {
+            crate::widgets::Narratable::edit_box(
+                self.message.clone(),
+                self.value.clone(),
+                [self.x, self.y, self.width, self.height],
+            )
+            .focused(self.focused)
+        });
         if self.bordered {
             let sprite = if self.focused {
                 "gui/sprites/widget/text_field_highlighted"
