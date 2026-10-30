@@ -6697,6 +6697,11 @@ impl Game<'_> {
             }
         }
         if let Some(title) = &self.title {
+            for found in title.lan_found_narrations((w, h)) {
+                self.say_system_queued(&found);
+            }
+        }
+        if let Some(title) = &self.title {
             title.draw(
                 &self.gui.atlas,
                 &mut batch,

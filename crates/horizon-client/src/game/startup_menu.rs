@@ -734,6 +734,9 @@ impl Loading {
         } else if let Some(title) = &mut self.menu.title {
             title.poll_backup();
             let _ = title.update_toast(self.settings.notification_display_time);
+            for found in title.lan_found_narrations((batch.width, batch.height)) {
+                horizon_narrator::say_system_queued(&found.plain());
+            }
             title.draw(
                 &gui.atlas,
                 batch,
