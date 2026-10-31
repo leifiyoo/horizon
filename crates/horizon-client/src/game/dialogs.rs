@@ -13,6 +13,7 @@ use horizon_client::{
     hud::{HudBatch, rgba},
     text::{ClickEvent, Text},
     ui,
+    widgets::{self, ScreenInfo},
 };
 use horizon_world::nbt::Tag;
 use std::time::Instant;
@@ -295,6 +296,14 @@ impl Game<'_> {
         ui::menu_background(batch, atlas, 0.0, 0.0, w, h, self.player.is_some());
         if self.dialogs.warning {
             let (title, message, [disconnect, back]) = warning_texts();
+            // DialogScreen.WarningScreen, a ConfirmScreen: its title and its
+            // message.
+            widgets::begin_screen(|| {
+                ScreenInfo::new(
+                    "dialog/warning",
+                    widgets::join_for_narration(&[&title.plain(), &message.plain()]),
+                )
+            });
             Confirm::new(&atlas.font, (w, h), &title, &message).draw(
                 batch,
                 atlas,
@@ -308,6 +317,12 @@ impl Game<'_> {
             let ticks = (since.elapsed().as_millis() / 50) as u32;
             let (label, visible, active) = waiting_button(ticks);
             let title = Text::translate("gui.waitingForResponse.title", &[]);
+            widgets::begin_screen(|| ScreenInfo::new("dialog/waiting", title.plain()));
+            // WaitingForResponseScreen.tick: the close button turning active
+            // after five seconds is narrated at once.
+            if active && ticks < 102 {
+                widgets::narrate_now();
+            }
             let top = ((h - 53.0) / 2.0).trunc();
             let tw = atlas.font.width_text(&title);
             batch.text_styled(
@@ -335,6 +350,11 @@ impl Game<'_> {
         let atlas = &self.gui.atlas;
         let [ax, ay, aw, ah] = layout.area;
         open.scroll.clamp(ay, ay + ah, layout.content);
+        // DialogScreen: titled by its dialog; a new dialog is a new screen.
+        widgets::begin_screen(|| {
+            let title = open.dialog.title.plain();
+            ScreenInfo::new(format!("dialog:{title}"), title)
+        });
         batch.text_styled(
             atlas,
             &open.dialog.title,
@@ -346,6 +366,19 @@ impl Game<'_> {
         let [wx, wy, ww, wh] = layout.warning;
         let warn_hover = ui::hovered(cursor, wx, wy, ww, wh);
         horizon_client::widgets::record("warning", layout.warning, true);
+        // The warning ImageButton: its narration message and tooltip, first
+        // in tab order (group -10).
+        widgets::narratable(|| {
+            let t = |key: &str| Text::translate(key, &[]).plain();
+            widgets::Narratable::button(
+                t("menu.custom_screen_info.button_narration"),
+                layout.warning,
+                true,
+            )
+            .hovered(warn_hover)
+            .hint(t("menu.custom_screen_info.tooltip"))
+            .order(-10)
+        });
         batch.sprite_scaled(
             atlas,
             WARNING_SPRITES[if warn_hover { 2 } else { 0 }],
@@ -374,6 +407,12 @@ impl Game<'_> {
                     if let Some(Some(edit)) = open.fields.get_mut(input) {
                         [edit.x, edit.y, edit.width, edit.height] = rect;
                         edit.focused = open.focus == Some(input);
+                        // The EditBox is named after its input's label.
+                        if widgets::narrating()
+                            && let Control::Text { label, .. } = &open.dialog.inputs[input].control
+                        {
+                            edit.message = label.plain();
+                        }
                         edit.draw(batch, atlas, None);
                     }
                 }
@@ -391,6 +430,9 @@ impl Game<'_> {
                         continue;
                     };
                     horizon_client::widgets::record(&label.plain(), rect, true);
+                    widgets::narratable(|| {
+                        widgets::Narratable::checkbox(label.plain(), on, rect, true).hovered(hover)
+                    });
                     batch.sprite_scaled(atlas, sprite, x, y, BOX, BOX, u32::MAX);
                     batch.text_styled(
                         atlas,
@@ -412,6 +454,25 @@ impl Game<'_> {
                         continue;
                     };
                     ui::button(batch, atlas, x, y, cw, ch, &label, true, hover);
+                    // A CycleButton: the option a click moves to.
+                    widgets::last_narratable(|n| {
+                        let control = &open.dialog.inputs[input].control;
+                        let next = match (control, open.values.get(input)) {
+                            (
+                                Control::SingleOption { options, .. },
+                                Some(InputValue::Option(i)),
+                            ) if !options.is_empty() => {
+                                let (id, display, _) = &options[(i + 1) % options.len()];
+                                display.clone().unwrap_or_else(|| Text::literal(id)).plain()
+                            }
+                            _ => String::new(),
+                        };
+                        n.what = widgets::What::Cycle {
+                            message: label.plain(),
+                            next,
+                            active: true,
+                        };
+                    });
                 }
                 Part::Slider { input, rect } => {
                     let [x, y, sw, sh] = rect;
@@ -465,6 +526,9 @@ impl Game<'_> {
                         (!clipped || in_area(cursor.1)) && ui::hovered(cursor, x, y, bw, bh);
                     let b = buttons[index];
                     ui::button(batch, atlas, x, y, bw, bh, &b.label, true, hover);
+                    if let Some(t) = &b.tooltip {
+                        widgets::last_narratable(|n| n.hint = Some(t.plain()));
+                    }
                     if hover && let Some(t) = &b.tooltip {
                         tooltip = Some(t.clone());
                     }
